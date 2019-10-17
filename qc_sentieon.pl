@@ -4,7 +4,7 @@ use Data::Dumper;
 use JSON;# qw( encode_json );
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# General QC-script for sentieon-data. Takes two arguments: SAMPLE-ID, TYPE(panel or wgs)
+# General QC-script for sentieon-data. Takes two arguments: SAMPLE-ID, TYPE(panel or wgs or umi)
 # PANEL: Requires the following algos from sentieon qc:
 #        --algo MeanQualityByCycle mq_metrics.txt \\
 #        --algo QualDistribution qd_metrics.txt \\
@@ -13,6 +13,7 @@ use JSON;# qw( encode_json );
 #        --algo InsertSizeMetricAlgo is_metrics.txt \\
 #        --algo HsMetricAlgo --targets_list $target_intervals --baits_list $target_intervals hs_metrics.txt \\
 #        --algo CoverageMetrics --cov_thresh 1 --cov_thresh 10 --cov_thresh 30 --cov_thresh 100 --cov_thresh 250 --cov_thresh 500 cov_metrics.txt
+# UMI: same as above, does not require dedupmetrics from locus_collector + dedup
 # WGS: Requires the following algos from sentieon qc
 #       --algo MeanQualityByCycle mq_metrics.txt \\
 #        --algo QualDistribution qd_metrics.txt \\
