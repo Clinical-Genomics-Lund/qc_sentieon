@@ -76,7 +76,7 @@ if ($type eq "wgs") {
     close HS;
 
 }
-elsif ($type eq "panel") {
+elsif ($type eq "panel" || $type eq "umi") {
     $metrics_file = "hs_metrics.txt";
     open( HS, $metrics_file );
     while( <HS> ) {
@@ -120,24 +120,26 @@ close INS;
 
 ## DEDUP ##
 
-open( DEDUP, $dedup_metrics_file );
-while( <DEDUP> ) {
-    if( /^\#SentieonCommandLine/ ) {
-	    <DEDUP>;
-	    my $vals = <DEDUP>;
-	    my @a = split /\t/, $vals;
-	    $results{'dup_reads'} = $a[6];
-        #print "dup_reads: $a[6]\n";
-	    $results{'num_reads'} = $a[2];
-        #print "num_reads: $a[2]\n";
-        $results{'dup_pct'} = $a[8];
-        #print "dup_pct: $a[8]\n";
-        my $mapped = $a[2]-$a[4];
-        $results{'mapped_reads'} = $mapped;
-        #print "mapped_reads: $mapped\n";
-	}
+if ( $type ne "umi") {
+    open( DEDUP, $dedup_metrics_file );
+    while( <DEDUP> ) {
+        if( /^\#SentieonCommandLine/ ) {
+            <DEDUP>;
+            my $vals = <DEDUP>;
+            my @a = split /\t/, $vals;
+            $results{'dup_reads'} = $a[6];
+            #print "dup_reads: $a[6]\n";
+            $results{'num_reads'} = $a[2];
+            #print "num_reads: $a[2]\n";
+            $results{'dup_pct'} = $a[8];
+            #print "dup_pct: $a[8]\n";
+            my $mapped = $a[2]-$a[4];
+            $results{'mapped_reads'} = $mapped;
+            #print "mapped_reads: $mapped\n";
+        }
+    }
+    close DEDUP;
 }
-close DEDUP;
 
 sub coverage_calc {
 
