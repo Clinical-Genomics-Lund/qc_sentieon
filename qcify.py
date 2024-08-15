@@ -1,8 +1,7 @@
-#!/usr/bin/python3
+#!/data/bnf/sw/miniconda3/bin/python
 from pprint import pprint
 import argparse
 import json
-import sys
 
 def main():
     parser = argparse.ArgumentParser(description="A script storing different qc outputs from sentieon driver algorithms into a json-blob for CDM")
@@ -20,6 +19,8 @@ def main():
     args = parser.parse_args()
 
     qc_array = []
+    if not args.SID:
+        exit("You need to supply a sample-id")
     # Load Picard-like output wgs-metrics / hs-metrics aln_metrics is_metrics dedup_metrics.txt gc_summary.txt 
     if args.assay_metrics:
         qc_array.append(read_picard_like_files(args.assay_metrics,"assay"))
@@ -39,7 +40,8 @@ def main():
         qc_array.append(read_vertical_picard(args.mq_metrics,"qualbycycle"))
     if args.qd_metrics:
         qc_array.append(read_vertical_picard(args.qd_metrics,"qualdist"))
-    pprint(qc_array)
+    with open(f"{args.SID}.json", 'w') as json_file:
+        json.dump(qc_array, json_file, indent=4)
 
 def read_picard_like_files(filename,category):
     """
