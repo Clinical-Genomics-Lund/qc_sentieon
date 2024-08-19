@@ -1,12 +1,12 @@
-#!/data/bnf/sw/miniconda3/bin/python
-from pprint import pprint
+#!/usr/bin/env python3
+from collections import defaultdict
+import sys
 import argparse
 import json
 
 def main():
     parser = argparse.ArgumentParser(description="A script storing different qc outputs from sentieon driver algorithms into a json-blob for CDM")
 
-    parser.add_argument("-s", "--SID",            help="Sample ID, required")
     parser.add_argument("-a", "--assay_metrics",  help="path to WgsMetricsAlgo or HsMetricAlgo algo output file")
     parser.add_argument("-l", "--aln_metrics",    help="path to AlignmentStat algo output file")
     parser.add_argument("-i", "--is_metrics",     help="path to InsertSizeMetricAlgo algo output file")
@@ -19,8 +19,6 @@ def main():
     args = parser.parse_args()
 
     qc_array = []
-    if not args.SID:
-        exit("You need to supply a sample-id")
     # Load Picard-like output wgs-metrics / hs-metrics aln_metrics is_metrics dedup_metrics.txt gc_summary.txt 
     if args.assay_metrics:
         qc_array.append(read_picard_like_files(args.assay_metrics,"assay"))
@@ -40,8 +38,7 @@ def main():
         qc_array.append(read_vertical_picard(args.mq_metrics,"qualbycycle"))
     if args.qd_metrics:
         qc_array.append(read_vertical_picard(args.qd_metrics,"qualdist"))
-    with open(f"{args.SID}.json", 'w') as json_file:
-        json.dump(qc_array, json_file, indent=4)
+    json.dump(qc_array, sys.stdout, indent=4)
 
 def read_picard_like_files(filename,category):
     """
@@ -49,18 +46,24 @@ def read_picard_like_files(filename,category):
     and creates key=value dicts instead
     """
     with open(filename, 'r') as file:
-        lines = file.readlines()
-        # Iterate through the lines to find the one starting with '#'
-        for i, line in enumerate(lines):
+        for line in file:         
+            line = line.strip()        
             if line.startswith('#'):
                 # The next line after the one starting with '#' contains the header
-                headers_line = lines[i + 1].strip().split('\t')
+                headers_line = next(file).strip().split('\t')
+                continue
+
+            if headers_line:
+                data_line = line.strip().split("\t")
                 break
-        data_line = lines[i + 2].strip().split('\t')
+
+            if headers_line is None or data_line is None:
+                raise ValueError("File does not contain expected headers and data lines.")
+            
     picard_dict = dict(zip(headers_line, data_line))
     algo_dict = {
         "software" : category,
-        "version" : "null",
+        "version" : None,
         "result": picard_dict
     }
     return algo_dict
@@ -77,52 +80,70 @@ def coverage_calc(filename,category):
     cov_dict = dict(zip(headers_line, sample_line))
     # coverage uniformity
     # interquartile range of coverage, if Q1 and Q3 are valid integers
-    if isinstance( cov_dict["granular_Q1"], int) and isinstance(cov_dict['granular_Q3'], int):
-        iqr = (int(cov_dict['granular_Q3']) - int(cov_dict['granular_Q1']))
-        cov_dict['coverage_uniformity'] = iqr / int(cov_dict['granular_median'])
+    try:
+       q1 = int(cov_dict['granular_Q1'])
+       q3 = int(cov_dict['granular_Q3'])
+       median = int(cov_dict['granular_median'])
+    except (ValueError, KeyError):
+        q1, q3, median = None, None, None
+        
+    if q1 is not None and q3 is not None and median not in (None, 0):
+        iqr = q3 - q1
+        cov_dict['coverage_uniformity'] = iqr / median
     else:
-        cov_dict['coverage_uniformity'] = "null"
+        cov_dict['coverage_uniformity'] = None
+        
+       
     algo_dict = {
         "software" : category,
-        "version" : "null",
+        "version" : None,
         "result": cov_dict
     }
     return algo_dict
 
-def read_vertical_picard(filename,category):
+def read_vertical_picard(filename, category):
     """
     Read rowbased data from picard and store as dict per column
     Histogram-data for plotting?
     """
+    
+    data = defaultdict(list)
+    
     with open(filename, 'r') as file:
-        lines = file.readlines()
-        for i, line in enumerate(lines):
-            if line.startswith('#'):
-                header_line = lines[i+1].strip().split('\t')
+        for line in file:    
+            if not line.startswith('#'):
+                header_line = line.strip().split()
                 break
-        list_dict = {header: [] for header in header_line}
-        for line in lines[2:]:
+        for line in file:
             line = line.strip()
             if not line:
                 continue
+                
             values = line.split()
+            
             # Map each value to its corresponding header
-            for i, header in enumerate(header_line):
+            for i, var_name in enumerate(header_line):
+            
                 # Append the value to the appropriate list in the dictionary
                 # Automatically convert to int or float if possible, otherwise keep as string
-                try:
-                    list_dict[header].append(int(values[i]))
-                except ValueError:
+                
+                value = values[i]
+            
+                for conversion in (int, float):
                     try:
-                        list_dict[header].append(float(values[i]))
+                        value = conversion(value)
+                        break
                     except ValueError:
-                        list_dict[header].append(values[i])
+                        continue
+                
+                data[var_name].append(value)
+                
     algo_dict = {
         "software" : category,
-        "version" : "null",
-        "result": list_dict
+        "version" : None,
+        "result": data
     }
-    return algo_dict              
+    return algo_dict                      
 
 if __name__ == "__main__":
     main()
